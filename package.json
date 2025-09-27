@@ -1,0 +1,36 @@
+{
+  "name": "fino_x_change",
+  "version": "1.0.0",
+  "description": "A peer-to-peer lending platform",
+  "main": "server.js",
+  "scripts": {
+    "test": "node server.js",
+    "start": "nodemon server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AnkitKrPathak/fino_x_change.git"
+  },
+  "keywords": [
+    "P2P",
+    "Lending",
+    "Fin-Tech",
+    "MERN stack"
+  ],
+  "author": "Ankit Kumar Pathak",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/AnkitKrPathak/fino_x_change/issues"
+  },
+  "homepage": "https://github.com/AnkitKrPathak/fino_x_change/Public/index.html",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.1",
+    "mysql2": "^3.14.4",
+    "nodemon": "^3.1.10"
+  }
+}
