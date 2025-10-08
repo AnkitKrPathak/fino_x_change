@@ -1,4 +1,4 @@
-const { createLoanRequest, getAllLoanRequests, getLoanRequestsByUser, updateLoanRequest, cancelLoanRequest, fundLoanRequest } = require("../models/loanModel");
+const { createLoanRequest, getAllLoanRequests, getLoanRequestsByUser, updateLoanRequest, cancelLoanRequest, fundLoanRequest, getBorrowerFundedLoans, getLenderFundedLoans } = require("../models/loanModel");
 
 // Borrower creates loan request
 const createLoan = async (req, res) => {
@@ -99,5 +99,32 @@ const fundLoan = async (req, res) => {
   }
 };
 
+const borrowerFundedLoans = async (req, res) => {
+  try {
+    const borrowerId = req.user.id;
+    const fundedLoans = await getBorrowerFundedLoans(borrowerId);
 
-module.exports = { createLoan, fetchAllLoans, fetchUserLoans, editLoan, cancelLoan, fundLoan };
+    res.status(200).json({
+      message: "Funded loans fetched successfully",
+      fundedLoans,
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+const lenderFundedLoans = async (req, res) => {
+  try {
+    const lenderId = req.user.id;
+    const fundedLoans = await getLenderFundedLoans(lenderId);
+
+    res.status(200).json({
+      message: "Funded loans fetched successfully for lender",
+      fundedLoans,
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+module.exports = { createLoan, fetchAllLoans, fetchUserLoans, editLoan, cancelLoan, fundLoan, borrowerFundedLoans, lenderFundedLoans };

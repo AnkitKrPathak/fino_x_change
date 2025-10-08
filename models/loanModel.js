@@ -90,5 +90,30 @@ const fundLoanRequest = async (loanId, lenderId) => {
   return updated[0];
 };
 
+// Get all funded loans for a borrower
+const getBorrowerFundedLoans = async (borrowerId) => {
+  const [rows] = await db.execute(
+    `SELECT lr.*, u.name AS lender_name, u.email AS lender_email
+     FROM loan_requests lr
+     JOIN users u ON lr.lender_id = u.id
+     WHERE lr.borrower_id = ? AND lr.status = 'funded'
+     ORDER BY lr.updated_at DESC`,
+    [borrowerId]
+  );
+  return rows;
+};
 
-module.exports = { createLoanRequest, getAllLoanRequests, getLoanRequestsByUser, updateLoanRequest, cancelLoanRequest, fundLoanRequest };
+// Get all funded loans for a lender
+const getLenderFundedLoans = async (lenderId) => {
+  const [rows] = await db.execute(
+    `SELECT lr.*, u.name AS borrower_name, u.email AS borrower_email
+     FROM loan_requests lr
+     JOIN users u ON lr.borrower_id = u.id
+     WHERE lr.lender_id = ? AND lr.status = 'funded'
+     ORDER BY lr.updated_at DESC`,
+    [lenderId]
+  );
+  return rows;
+};
+
+module.exports = { createLoanRequest, getAllLoanRequests, getLoanRequestsByUser, updateLoanRequest, cancelLoanRequest, fundLoanRequest, getBorrowerFundedLoans, getLenderFundedLoans };
