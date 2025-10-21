@@ -7,6 +7,7 @@ dotenv.config();
 
 const authRoutes = require("./routes/authRoutes");
 const loanRoutes = require("./routes/loanRoutes");
+const repaymentRoutes = require("./routes/repaymentRoutes");
 
 
 const app = express();
@@ -18,5 +19,6 @@ app.use(express.json());
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/loans", loanRoutes);
+app.use("/api/repayments", repaymentRoutes);
 
 module.exports = app;

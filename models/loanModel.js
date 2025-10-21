@@ -116,4 +116,21 @@ const getLenderFundedLoans = async (lenderId) => {
   return rows;
 };
 
-module.exports = { createLoanRequest, getAllLoanRequests, getLoanRequestsByUser, updateLoanRequest, cancelLoanRequest, fundLoanRequest, getBorrowerFundedLoans, getLenderFundedLoans };
+// Get single loan by ID
+const getLoanById = async (loanId) => {
+  const [rows] = await db.execute(
+    "SELECT * FROM loan_requests WHERE id = ?",
+    [loanId]
+  );
+  return rows[0];
+};
+
+// Update loan status
+const updateLoanStatus = async (loanId, status) => {
+  await db.execute(
+    "UPDATE loan_requests SET status = ?, updated_at = NOW() WHERE id = ?",
+    [status, loanId]
+  );
+};
+
+module.exports = { createLoanRequest, getAllLoanRequests, getLoanRequestsByUser, updateLoanRequest, cancelLoanRequest, fundLoanRequest, getBorrowerFundedLoans, getLenderFundedLoans, getLoanById, updateLoanStatus };
