@@ -1,5 +1,5 @@
 const express = require("express");
-const { createLoan, fetchAllLoans, fetchUserLoans, editLoan, cancelLoan, fundLoan, borrowerFundedLoans, lenderFundedLoans } = require("../controllers/loanController");
+const { createLoan, fetchAllLoans, fetchUserLoans, editLoan, cancelLoan, fundLoan, borrowerFundedLoans, lenderFundedLoans, borrowerCompletedLoans, lenderCompletedLoans } = require("../controllers/loanController");
 const authMiddleware = require("../middlewares/authMiddleware");
 
 const router = express.Router();
@@ -27,5 +27,11 @@ router.get("/funded", authMiddleware, borrowerFundedLoans);
 
 // Get funded loans for lender
 router.get("/funded/lender", authMiddleware, lenderFundedLoans);
+
+// Get completed loans for borrower
+router.get("/completed/borrower", authMiddleware, borrowerCompletedLoans);
+
+// Get completed loans for lender
+router.get("/completed/lender", authMiddleware, lenderCompletedLoans);
 
 module.exports = router;

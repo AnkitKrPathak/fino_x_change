@@ -1,4 +1,4 @@
-const { createLoanRequest, getAllLoanRequests, getLoanRequestsByUser, updateLoanRequest, cancelLoanRequest, fundLoanRequest, getBorrowerFundedLoans, getLenderFundedLoans } = require("../models/loanModel");
+const { createLoanRequest, getAllLoanRequests, getLoanRequestsByUser, updateLoanRequest, cancelLoanRequest, fundLoanRequest, getBorrowerFundedLoans, getLenderFundedLoans, getCompletedLoansForBorrower, getCompletedLoansForLender } = require("../models/loanModel");
 
 // Borrower creates loan request
 const createLoan = async (req, res) => {
@@ -127,4 +127,34 @@ const lenderFundedLoans = async (req, res) => {
   }
 };
 
-module.exports = { createLoan, fetchAllLoans, fetchUserLoans, editLoan, cancelLoan, fundLoan, borrowerFundedLoans, lenderFundedLoans };
+const borrowerCompletedLoans = async (req, res) => {
+  try {
+    const borrowerId = req.user.id;
+    const completedLoans = await getCompletedLoansForBorrower(borrowerId);
+
+    res.status(200).json({
+      success: true,
+      count: completedLoans.length,
+      completed_loans: completedLoans
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const lenderCompletedLoans = async (req, res) => {
+  try {
+    const lenderId = req.user.id;
+    const completedLoans = await getCompletedLoansForLender(lenderId);
+
+    res.status(200).json({
+      success: true,
+      count: completedLoans.length,
+      completed_loans: completedLoans
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { createLoan, fetchAllLoans, fetchUserLoans, editLoan, cancelLoan, fundLoan, borrowerFundedLoans, lenderFundedLoans, borrowerCompletedLoans, lenderCompletedLoans };

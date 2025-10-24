@@ -133,4 +133,46 @@ const updateLoanStatus = async (loanId, status) => {
   );
 };
 
-module.exports = { createLoanRequest, getAllLoanRequests, getLoanRequestsByUser, updateLoanRequest, cancelLoanRequest, fundLoanRequest, getBorrowerFundedLoans, getLenderFundedLoans, getLoanById, updateLoanStatus };
+// Get all completed loans for a borrower
+const getCompletedLoansForBorrower = async (borrowerId) => {
+  const [rows] = await db.execute(
+    `
+    SELECT 
+      l.id AS loan_id,
+      l.amount,
+      l.status,
+      l.created_at,
+      u.name AS lender_name,
+      u.email AS lender_email
+    FROM loan_requests l
+    JOIN users u ON l.lender_id = u.id
+    WHERE l.borrower_id = ? AND l.status = 'completed'
+    ORDER BY l.updated_at DESC
+    `,
+    [borrowerId]
+  );
+  return rows;
+};
+
+// Get all completed loans for a lender
+const getCompletedLoansForLender = async (lenderId) => {
+  const [rows] = await db.execute(
+    `
+    SELECT 
+      l.id AS loan_id,
+      l.amount,
+      l.status,
+      l.created_at,
+      u.name AS borrower_name,
+      u.email AS borrower_email
+    FROM loan_requests l
+    JOIN users u ON l.borrower_id = u.id
+    WHERE l.lender_id = ? AND l.status = 'completed'
+    ORDER BY l.updated_at DESC
+    `,
+    [lenderId]
+  );
+  return rows;
+};
+
+module.exports = { createLoanRequest, getAllLoanRequests, getLoanRequestsByUser, updateLoanRequest, cancelLoanRequest, fundLoanRequest, getBorrowerFundedLoans, getLenderFundedLoans, getLoanById, updateLoanStatus, getCompletedLoansForBorrower, getCompletedLoansForLender };
