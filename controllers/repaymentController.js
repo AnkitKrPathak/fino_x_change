@@ -2,36 +2,92 @@ const repaymentModel = require("../models/repaymentModel");
 const loanModel = require("../models/loanModel");
 const db = require("../config/db");
 
-// Borrower makes repayment
+// Initiate repayment
 const makeRepayment = async (req, res) => {
-  const borrowerId = req.user.id;
-  const { loanId } = req.body;
-
   try {
-    // 1. Check if loan exists and is funded
+    const borrower_id = req.user.id;
+    const { loan_id, amount } = req.body;
+
     const loan = await loanModel.getLoanById(loanId);
     if (!loan) return res.status(404).json({ message: "Loan not found" });
+
+    if (loan.borrower_id !== borrower_id)
+      return res.status(403).json({ message: "Not authorized to repay this loan" });
+
     if (loan.status !== "funded")
       return res.status(400).json({ message: "Loan is not funded" });
-    if (loan.borrower_id !== borrowerId)
-      return res.status(403).json({ message: "Not authorized" });
 
-    // 2. Record repayment
+    if (amount <= 0)
+      return res.status(400).json({ message: "Repayment amount must be greater than 0" });
+
+    const current_balance = loan.remaining_balance ?? loan.amount;
+    const payment_type = amount >= current_balance ? "full" : "emi";
+
     await repaymentModel.createRepayment(
-      loanId,
-      borrowerId,
+      loan_id,
+      borrower_id,
       loan.lender_id,
-      loan.amount
+      amount,
+      payment_type
     );
 
-    // 3. Update loan status to completed
-    await loanModel.updateLoanStatus(loanId, "completed");
+    const new_balance = parseFloat((current_balance - amount).toFixed(2));
+    await db.execute(
+      "UPDATE loan_requests SET remaining_balance = ? WHERE id = ?",
+      [new_balance > 0 ? new_balance : 0, loan_id]
+    );
 
-    res.status(201).json({
-      message: "Repayment successful. Loan marked as completed.",
-      loanId,
-      amount: loan.amount
+    if (new_balance <= 0) {
+      await loanModel.updateLoanStatus(loanId, "completed");
+    }
+
+    res.status(200).json({
+      message:
+        payment_type === "full"
+          ? "Full repayment completed successfully."
+          : "Partial repayment (EMI) recorded successfully.",
+      loan_id,
+      payment_type,
+      paid_amount: amount,
+      remaining_balance: new_balance > 0 ? new_balance : 0,
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// View repayment schedule (EMI preview)
+const viewSchedule = async (req, res) => {
+  try {
+    const { loan_id } = req.params;
+
+    const loan = await loanModel.getLoanById(loanId);
+    if (!loan) return res.status(404).json({ message: "Loan not found" });
+
+    const EMI = repaymentModel.calculateEMI(
+      loan.amount,
+      loan.interest_rate,
+      loan.duration_months
+    );
+    const total_payable = EMI * loan.duration_months;
+
+    res.status(200).json({
+      EMI_per_month: EMI,
+      total_payable: parseFloat(total_payable.toFixed(2)),
+      duration_months: loan.duration_months,
+      interest_rate: loan.interest_rate,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// View repayment history
+const getRepaymentHistory = async (req, res) => {
+  try {
+    const { loan_id } = req.params;
+    const history = await repaymentModel.getRepaymentHistoryByLoan(loan_id);
+    res.status(200).json({ history });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -59,4 +115,4 @@ const getLenderRepayments = async (req, res) => {
   }
 };
 
-module.exports = { makeRepayment, getBorrowerRepayments, getLenderRepayments };
+module.exports = { makeRepayment, viewSchedule, getRepaymentHistory, getBorrowerRepayments, getLenderRepayments };
