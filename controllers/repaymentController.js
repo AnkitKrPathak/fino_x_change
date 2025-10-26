@@ -8,7 +8,7 @@ const makeRepayment = async (req, res) => {
     const borrower_id = req.user.id;
     const { loan_id, amount } = req.body;
 
-    const loan = await loanModel.getLoanById(loanId);
+    const loan = await loanModel.getLoanById(loan_id);
     if (!loan) return res.status(404).json({ message: "Loan not found" });
 
     if (loan.borrower_id !== borrower_id)
@@ -20,7 +20,7 @@ const makeRepayment = async (req, res) => {
     if (amount <= 0)
       return res.status(400).json({ message: "Repayment amount must be greater than 0" });
 
-    const current_balance = loan.remaining_balance ?? loan.amount;
+    const current_balance = loan.remaining_balance;
     const payment_type = amount >= current_balance ? "full" : "emi";
 
     await repaymentModel.createRepayment(
@@ -38,7 +38,7 @@ const makeRepayment = async (req, res) => {
     );
 
     if (new_balance <= 0) {
-      await loanModel.updateLoanStatus(loanId, "completed");
+      await loanModel.updateLoanStatus(loan_id, "completed");
     }
 
     res.status(200).json({
@@ -61,7 +61,7 @@ const viewSchedule = async (req, res) => {
   try {
     const { loan_id } = req.params;
 
-    const loan = await loanModel.getLoanById(loanId);
+    const loan = await loanModel.getLoanById(loan_id);
     if (!loan) return res.status(404).json({ message: "Loan not found" });
 
     const EMI = repaymentModel.calculateEMI(
@@ -69,11 +69,10 @@ const viewSchedule = async (req, res) => {
       loan.interest_rate,
       loan.duration_months
     );
-    const total_payable = EMI * loan.duration_months;
 
     res.status(200).json({
       EMI_per_month: EMI,
-      total_payable: parseFloat(total_payable.toFixed(2)),
+      total_payable: loan.total_payable,
       duration_months: loan.duration_months,
       interest_rate: loan.interest_rate,
     });

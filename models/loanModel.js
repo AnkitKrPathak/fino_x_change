@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const repaymentModel = require("./repaymentModel");
 
 // Create loan request
 const createLoanRequest = async (borrowerId, amount, interestRate, durationMonths) => {
@@ -79,10 +80,17 @@ const fundLoanRequest = async (loanId, lenderId) => {
     throw new Error("Loan already funded or cancelled");
   }
 
-  
+  const remaining_balance = loan.amount;
+  const EMI = repaymentModel.calculateEMI(
+    loan.amount,
+    loan.interest_rate,
+    loan.duration_months
+  );
+  const total_payable = EMI * loan.duration_months;
+
   await db.execute(
-    "UPDATE loan_requests SET lender_id = ?, status = 'funded', updated_at = NOW() WHERE id = ?",
-    [lenderId, loanId]
+    "UPDATE loan_requests SET lender_id = ?, status = 'funded', remaining_balance = ?, total_payable = ?, updated_at = NOW() WHERE id = ?",
+    [lenderId, remaining_balance, total_payable, loanId]
   );
 
   
