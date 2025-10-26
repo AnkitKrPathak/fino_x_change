@@ -52,7 +52,7 @@ const updateLoanRequest = async (loanId, borrowerId, amount, interestRate, durat
      WHERE id = ? AND borrower_id = ? AND status = 'pending'`,
     [amount, interestRate, durationMonths, loanId, borrowerId]
   );
-  return result.affectedRows; // returns 1 if updated
+  return result.affectedRows;
 };
 
 // Cancel loan request (only if pending)
@@ -63,7 +63,7 @@ const cancelLoanRequest = async (loanId, borrowerId) => {
      WHERE id = ? AND borrower_id = ? AND status = 'pending'`,
     [loanId, borrowerId]
   );
-  return result.affectedRows; // returns 1 if updated
+  return result.affectedRows;
 };
 
 // Fund a loan request
