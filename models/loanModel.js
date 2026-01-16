@@ -66,37 +66,37 @@ const cancelLoanRequest = async (loanId, borrowerId) => {
   return result.affectedRows;
 };
 
-// Fund a loan request
-const fundLoanRequest = async (loanId, lenderId) => {
+// // Fund a loan request
+// const fundLoanRequest = async (loanId, lenderId) => {
   
-  const [loanRows] = await db.execute("SELECT * FROM loan_requests WHERE id = ?", [loanId]);
-  const loan = loanRows[0];
+//   const [loanRows] = await db.execute("SELECT * FROM loan_requests WHERE id = ?", [loanId]);
+//   const loan = loanRows[0];
 
-  if (!loan) {
-    throw new Error("Loan not found");
-  }
+//   if (!loan) {
+//     throw new Error("Loan not found");
+//   }
 
-  if (loan.status !== "pending") {
-    throw new Error("Loan already funded or cancelled");
-  }
+//   if (loan.status !== "pending") {
+//     throw new Error("Loan already funded or cancelled");
+//   }
 
-  const remaining_balance = loan.amount;
-  const EMI = repaymentModel.calculateEMI(
-    loan.amount,
-    loan.interest_rate,
-    loan.duration_months
-  );
-  const total_payable = EMI * loan.duration_months;
+//   const remaining_balance = loan.amount;
+//   const EMI = repaymentModel.calculateEMI(
+//     loan.amount,
+//     loan.interest_rate,
+//     loan.duration_months
+//   );
+//   const total_payable = EMI * loan.duration_months;
 
-  await db.execute(
-    "UPDATE loan_requests SET lender_id = ?, status = 'funded', remaining_balance = ?, total_payable = ?, updated_at = NOW() WHERE id = ?",
-    [lenderId, remaining_balance, total_payable, loanId]
-  );
+//   await db.execute(
+//     "UPDATE loan_requests SET lender_id = ?, status = 'funded', remaining_balance = ?, total_payable = ?, updated_at = NOW() WHERE id = ?",
+//     [lenderId, remaining_balance, total_payable, loanId]
+//   );
 
   
-  const [updated] = await db.execute("SELECT * FROM loan_requests WHERE id = ?", [loanId]);
-  return updated[0];
-};
+//   const [updated] = await db.execute("SELECT * FROM loan_requests WHERE id = ?", [loanId]);
+//   return updated[0];
+// };
 
 // Get all funded loans for a borrower
 const getBorrowerFundedLoans = async (borrowerId) => {
@@ -183,4 +183,4 @@ const getCompletedLoansForLender = async (lenderId) => {
   return rows;
 };
 
-module.exports = { createLoanRequest, getAllLoanRequests, getLoanRequestsByUser, updateLoanRequest, cancelLoanRequest, fundLoanRequest, getBorrowerFundedLoans, getLenderFundedLoans, getLoanById, updateLoanStatus, getCompletedLoansForBorrower, getCompletedLoansForLender };
+module.exports = { createLoanRequest, getAllLoanRequests, getLoanRequestsByUser, updateLoanRequest, cancelLoanRequest, getBorrowerFundedLoans, getLenderFundedLoans, getLoanById, updateLoanStatus, getCompletedLoansForBorrower, getCompletedLoansForLender };

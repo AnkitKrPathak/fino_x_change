@@ -1,4 +1,11 @@
-const { createLoanRequest, getAllLoanRequests, getLoanRequestsByUser, updateLoanRequest, cancelLoanRequest, fundLoanRequest, getBorrowerFundedLoans, getLenderFundedLoans, getCompletedLoansForBorrower, getCompletedLoansForLender } = require("../models/loanModel");
+const razorpay = require("../config/razorpay");
+const db = require("../config/db");
+const repaymentModel = require("../models/repaymentModel");
+const { createLoanRequest, getAllLoanRequests, getLoanRequestsByUser, updateLoanRequest, cancelLoanRequest, getBorrowerFundedLoans, getLenderFundedLoans, getCompletedLoansForBorrower, getCompletedLoansForLender, getLoanById } = require("../models/loanModel");
+const { createLoanLend, markLendSuccess, getLendByOrderId } = require("../models/loanLendModel");
+const { createRazorpayOrder } = require("../services/razorpayService");
+const { verifyRazorpaySignature } = require("../utils/razorpayUtils");
+
 
 // Borrower creates loan request
 const createLoan = async (req, res) => {
@@ -83,21 +90,110 @@ const cancelLoan = async (req, res) => {
   }
 };
 
+// const fundLoan = async (req, res) => {
+//   try {
+//     const lenderId = req.user.id; // from JWT
+//     const { id } = req.params; // loan ID
+
+//     const fundedLoan = await fundLoanRequest(id, lenderId);
+
+//     res.status(200).json({
+//       message: "Loan funded successfully",
+//       fundedLoan,
+//     });
+//   } catch (error) {
+//     res.status(400).json({ message: error.message });
+//   }
+// };
+
 const fundLoan = async (req, res) => {
   try {
-    const lenderId = req.user.id; // from JWT
-    const { id } = req.params; // loan ID
+    const lenderId = req.user.id;
+    const { id: loanId } = req.params;
 
-    const fundedLoan = await fundLoanRequest(id, lenderId);
+    const loan = await getLoanById(loanId);
+
+    if (!loan) return res.status(404).json({ message: "Loan not found" });
+    if (loan.status !== "pending")
+      return res.status(400).json({ message: "Loan already funded or cancelled" });
+
+    const order = await createRazorpayOrder({
+      amount: loan.amount,
+      receipt: `lend_${loanId}_${lenderId}`,
+      notes: {
+        loanId,
+        lenderId,
+        borrowerId: loan.borrower_id
+      }
+    });
+
+    await createLoanLend({
+      loanId,
+      lenderId,
+      borrowerId: loan.borrower_id,
+      amount: loan.amount,
+      razorpayOrderId: order.id
+    });
 
     res.status(200).json({
-      message: "Loan funded successfully",
-      fundedLoan,
+      message: "Razorpay order created",
+      order
     });
+
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error("Fund Loan Error:", error);
+    res.status(500).json({ message: error.message });
   }
 };
+
+const verifyLendPayment = async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    const isValid = verifyRazorpaySignature({
+      order_id: razorpay_order_id,
+      payment_id: razorpay_payment_id,
+      signature: razorpay_signature
+    });
+
+    if (!isValid) {
+      return res.status(400).json({ message: "Invalid Razorpay signature" });
+    }
+
+    const lend = await getLendByOrderId(razorpay_order_id);
+    if (!lend) return res.status(404).json({ message: "Lend record not found" });
+
+    await markLendSuccess({
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      signature: razorpay_signature
+    });
+
+    const loan = await getLoanById(lend.loan_id);
+
+    const EMI = repaymentModel.calculateEMI(
+      loan.amount,
+      loan.interest_rate,
+      loan.duration_months
+    );
+
+    const totalPayable = EMI * loan.duration_months;
+
+    await db.execute(
+      `UPDATE loan_requests 
+       SET lender_id = ?, status = 'funded', remaining_balance = ?, total_payable = ?, updated_at = NOW()
+       WHERE id = ?`,
+      [lend.lender_id, loan.amount, totalPayable, lend.loan_id]
+    );
+
+    res.json({ message: "Loan funded successfully after payment verification" });
+
+  } catch (error) {
+    console.error("Verify Lend Payment Error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 
 const borrowerFundedLoans = async (req, res) => {
   try {
@@ -157,4 +253,4 @@ const lenderCompletedLoans = async (req, res) => {
   }
 };
 
-module.exports = { createLoan, fetchAllLoans, fetchUserLoans, editLoan, cancelLoan, fundLoan, borrowerFundedLoans, lenderFundedLoans, borrowerCompletedLoans, lenderCompletedLoans };
+module.exports = { createLoan, fetchAllLoans, fetchUserLoans, editLoan, cancelLoan, fundLoan, verifyLendPayment, borrowerFundedLoans, lenderFundedLoans, borrowerCompletedLoans, lenderCompletedLoans };

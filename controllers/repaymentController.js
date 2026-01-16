@@ -1,8 +1,11 @@
 const repaymentModel = require("../models/repaymentModel");
 const loanModel = require("../models/loanModel");
 const db = require("../config/db");
+const { createRazorpayOrder } = require("../services/razorpayService");
+const { verifyRazorpaySignature } = require("../utils/razorpayUtils");
 
-// Initiate repayment
+
+// Initiate repayment → create Razorpay order
 const makeRepayment = async (req, res) => {
   try {
     const borrower_id = req.user.id;
@@ -17,44 +20,118 @@ const makeRepayment = async (req, res) => {
     if (loan.status !== "funded")
       return res.status(400).json({ message: "Loan is not funded" });
 
-    if (amount <= 0)
+    if (!amount || amount <= 0)
       return res.status(400).json({ message: "Repayment amount must be greater than 0" });
 
     const current_balance = loan.remaining_balance;
+    if (amount > current_balance + 0.01) {
+      return res
+        .status(400)
+        .json({ message: "Repayment amount cannot exceed remaining balance" });
+    }
+
     const payment_type = amount >= current_balance ? "full" : "emi";
 
-    await repaymentModel.createRepayment(
-      loan_id,
-      borrower_id,
-      loan.lender_id,
+    const order = await createRazorpayOrder({
       amount,
-      payment_type
-    );
+      receipt: `repay_${loan_id}_${borrower_id}`,
+      notes: {
+        loanId: loan_id,
+        borrowerId: borrower_id,
+        lenderId: loan.lender_id,
+        paymentType: payment_type,
+      },
+    });
 
-    const new_balance = parseFloat((current_balance - amount).toFixed(2));
+    await repaymentModel.createRepayment({
+      loanId: loan_id,
+      borrowerId: borrower_id,
+      lenderId: loan.lender_id,
+      amount,
+      paymentType: payment_type,
+      razorpayOrderId: order.id,
+    });
+
+    res.status(200).json({
+      message: "Repayment order created",
+      order,
+      meta: {
+        loan_id,
+        payment_type,
+        current_balance,
+      },
+    });
+  } catch (error) {
+    console.error("Make Repayment Error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Verify Razorpay payment for repayment and update loan
+const verifyRepaymentPayment = async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    const isValid = verifyRazorpaySignature({
+      order_id: razorpay_order_id,
+      payment_id: razorpay_payment_id,
+      signature: razorpay_signature,
+    });
+
+    if (!isValid) {
+      return res.status(400).json({ message: "Invalid Razorpay signature" });
+    }
+
+    const repayment = await repaymentModel.getRepaymentByOrderId(razorpay_order_id);
+    if (!repayment) {
+      return res.status(404).json({ message: "Repayment record not found" });
+    }
+
+    // Optional: prevent double-processing
+    if (repayment.payment_status === "success") {
+      return res.status(200).json({ message: "Repayment already processed" });
+    }
+
+    await repaymentModel.markRepaymentSuccess({
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      signature: razorpay_signature,
+    });
+
+    const loan = await loanModel.getLoanById(repayment.loan_id);
+    if (!loan) {
+      return res.status(404).json({ message: "Loan not found for this repayment" });
+    }
+
+    const current_balance = loan.remaining_balance;
+    const new_balance = parseFloat((current_balance - repayment.amount).toFixed(2));
+    const final_balance = new_balance > 0 ? new_balance : 0;
+
     await db.execute(
       "UPDATE loan_requests SET remaining_balance = ? WHERE id = ?",
-      [new_balance > 0 ? new_balance : 0, loan_id]
+      [final_balance, repayment.loan_id]
     );
 
-    if (new_balance <= 0) {
-      await loanModel.updateLoanStatus(loan_id, "completed");
+    if (final_balance <= 0) {
+      await loanModel.updateLoanStatus(repayment.loan_id, "completed");
     }
 
     res.status(200).json({
       message:
-        payment_type === "full"
+        repayment.payment_type === "full"
           ? "Full repayment completed successfully."
           : "Partial repayment (EMI) recorded successfully.",
-      loan_id,
-      payment_type,
-      paid_amount: amount,
-      remaining_balance: new_balance > 0 ? new_balance : 0,
+      loan_id: repayment.loan_id,
+      payment_type: repayment.payment_type,
+      paid_amount: repayment.amount,
+      remaining_balance: final_balance,
     });
   } catch (error) {
+    console.error("Verify Repayment Error:", error);
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // View repayment schedule (EMI preview)
 const viewSchedule = async (req, res) => {
@@ -114,4 +191,11 @@ const getLenderRepayments = async (req, res) => {
   }
 };
 
-module.exports = { makeRepayment, viewSchedule, getRepaymentHistory, getBorrowerRepayments, getLenderRepayments };
+module.exports = {
+  makeRepayment,
+  verifyRepaymentPayment,
+  viewSchedule,
+  getRepaymentHistory,
+  getBorrowerRepayments,
+  getLenderRepayments,
+};

@@ -3,8 +3,12 @@ const router = express.Router();
 const repaymentController = require("../controllers/repaymentController");
 const authMiddleware = require("../middlewares/authMiddleware");
 
-// Make a repayment (EMI or full)
+// Make a repayment (create Razorpay order)
 router.post("/", authMiddleware, repaymentController.makeRepayment);
+
+// Verify repayment payment after Razorpay success
+router.post("/verify", authMiddleware, repaymentController.verifyRepaymentPayment
+);
 
 // View repayment schedule (EMI preview) for a loan
 router.get("/schedule/:loan_id", authMiddleware, repaymentController.viewSchedule);
