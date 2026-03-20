@@ -27,8 +27,14 @@ const addRating = async (req, res) => {
       return res.status(400).json({ message: "Invalid role" });
     }
 
+    // One-time rating: check if user already rated for this loan
+    const alreadyRated = await ratingModel.hasRatedForLoan(loanId, raterUserId);
+    if (alreadyRated) {
+      return res.status(400).json({ message: "You have already rated for this loan" });
+    }
+
     // Add rating
-    await ratingModel.addRating(ratedUserId, raterUserId, role, rating, comment);
+    await ratingModel.addRating(ratedUserId, raterUserId, role, rating, comment, loanId);
 
     res.status(201).json({
       message: `Successfully rated ${role}`,
@@ -36,6 +42,18 @@ const addRating = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// Get loan IDs the current user has already rated (for hiding Rate button)
+const getRatedLoanIds = async (req, res) => {
+  try {
+    const raterUserId = req.user.id;
+    const loanIds = await ratingModel.getRatedLoanIds(raterUserId);
+    res.status(200).json({ loanIds });
+  } catch (error) {
+    // If loan_id column doesn't exist yet, return empty (run migrations/add_loan_id_to_user_ratings.sql)
+    res.status(200).json({ loanIds: [] });
   }
 };
 
@@ -51,4 +69,4 @@ const getUserRatings = async (req, res) => {
   }
 };
 
-module.exports = { addRating, getUserRatings };
+module.exports = { addRating, getUserRatings, getRatedLoanIds };

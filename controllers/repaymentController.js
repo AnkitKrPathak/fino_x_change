@@ -103,16 +103,19 @@ const verifyRepaymentPayment = async (req, res) => {
       return res.status(404).json({ message: "Loan not found for this repayment" });
     }
 
-    const current_balance = loan.remaining_balance;
-    const new_balance = parseFloat((current_balance - repayment.amount).toFixed(2));
-    const final_balance = new_balance > 0 ? new_balance : 0;
+    const current_balance = parseFloat(loan.remaining_balance) || 0;
+    const repayAmount = parseFloat(repayment.amount) || 0;
+    const new_balance = parseFloat((current_balance - repayAmount).toFixed(2));
+    const final_balance = Math.max(0, new_balance);
 
     await db.execute(
-      "UPDATE loan_requests SET remaining_balance = ? WHERE id = ?",
+      "UPDATE loan_requests SET remaining_balance = ?, updated_at = NOW() WHERE id = ?",
       [final_balance, repayment.loan_id]
     );
 
-    if (final_balance <= 0) {
+    // Only mark completed when it was a full repayment (amount >= remaining)
+    // This prevents EMI/partial repayments from incorrectly completing the loan
+    if (repayment.payment_type === "full" && final_balance <= 0.01) {
       await loanModel.updateLoanStatus(repayment.loan_id, "completed");
     }
 

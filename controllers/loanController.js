@@ -26,10 +26,11 @@ const createLoan = async (req, res) => {
   }
 };
 
-// Get all loan requests (for lenders to browse)
+// Get all loan requests (for lenders to browse) - excludes current user's own requests
 const fetchAllLoans = async (req, res) => {
   try {
-    const loans = await getAllLoanRequests();
+    const currentUserId = req.user.id;
+    const loans = await getAllLoanRequests(currentUserId);
     res.json(loans);
   } catch (error) {
     console.error("Fetch Loans Error:", error);

@@ -1,14 +1,32 @@
 const db = require("../config/db");
 
+// Check if user has already rated for this loan (one rating per loan)
+const hasRatedForLoan = async (loanId, raterUserId) => {
+  const [rows] = await db.execute(
+    "SELECT 1 FROM user_ratings WHERE loan_id = ? AND rater_user_id = ? LIMIT 1",
+    [loanId, raterUserId]
+  );
+  return rows.length > 0;
+};
+
+// Get loan IDs the user has already rated
+const getRatedLoanIds = async (raterUserId) => {
+  const [rows] = await db.execute(
+    "SELECT loan_id FROM user_ratings WHERE rater_user_id = ? AND loan_id IS NOT NULL",
+    [raterUserId]
+  );
+  return rows.map((r) => r.loan_id);
+};
+
 // Add a new rating (also updates user average ratings)
-const addRating = async (ratedUserId, raterUserId, role, rating, comment) => {
+const addRating = async (ratedUserId, raterUserId, role, rating, comment, loanId) => {
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
 
     await connection.execute(
-      "INSERT INTO user_ratings (rated_user_id, rater_user_id, role, rating, comment) VALUES (?, ?, ?, ?, ?)",
-      [ratedUserId, raterUserId, role, rating, comment]
+      "INSERT INTO user_ratings (rated_user_id, rater_user_id, role, rating, comment, loan_id) VALUES (?, ?, ?, ?, ?, ?)",
+      [ratedUserId, raterUserId, role, rating, comment, loanId]
     );
 
     const [rows] = await connection.execute(
@@ -62,4 +80,4 @@ const getUserFeedback = async (userId) => {
   return rows;
 };
 
-module.exports = { addRating, getUserRatings, getUserFeedback };
+module.exports = { addRating, getUserRatings, getUserFeedback, hasRatedForLoan, getRatedLoanIds };

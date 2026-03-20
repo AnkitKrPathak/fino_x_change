@@ -23,15 +23,40 @@ const createLoanRequest = async (borrowerId, amount, interestRate, durationMonth
 // };
 
 
-// Get only active (pending) loan requests
-const getAllLoanRequests = async () => {
-  const [rows] = await db.execute(`
-    SELECT lr.*, u.name AS borrower_name, u.email AS borrower_email
+// Get only active (pending) loan requests, optionally excluding current user's requests
+const getAllLoanRequests = async (excludeUserId = null) => {
+  let query = `
+    SELECT 
+      lr.id,
+      lr.borrower_id,
+      lr.amount,
+      lr.interest_rate,
+      lr.duration_months,
+      lr.status,
+      lr.created_at,
+      lr.updated_at,
+      u.name AS borrower_name,
+      u.email AS borrower_email,
+      (
+        SELECT ROUND(AVG(ur.rating), 2)
+        FROM user_ratings ur
+        WHERE ur.rated_user_id = lr.borrower_id
+          AND ur.role = 'borrower'
+      ) AS borrower_avg_rating
     FROM loan_requests lr
-    JOIN users u ON lr.borrower_id = u.id
+    INNER JOIN users u ON lr.borrower_id = u.id
     WHERE lr.status = 'pending'
-    ORDER BY lr.created_at DESC
-  `);
+  `;
+  const params = [];
+  if (excludeUserId != null) {
+    query += ` AND lr.borrower_id != ?`;
+    params.push(excludeUserId);
+  }
+  query += ` ORDER BY lr.created_at DESC`;
+
+  const [rows] = params.length
+    ? await db.execute(query, params)
+    : await db.execute(query);
   return rows;
 };
 
@@ -150,6 +175,7 @@ const getCompletedLoansForBorrower = async (borrowerId) => {
       l.amount,
       l.status,
       l.created_at,
+      l.updated_at AS completed_at,
       u.name AS lender_name,
       u.email AS lender_email
     FROM loan_requests l
@@ -171,6 +197,7 @@ const getCompletedLoansForLender = async (lenderId) => {
       l.amount,
       l.status,
       l.created_at,
+      l.updated_at AS completed_at,
       u.name AS borrower_name,
       u.email AS borrower_email
     FROM loan_requests l
