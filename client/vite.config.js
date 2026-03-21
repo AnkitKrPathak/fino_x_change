@@ -8,7 +8,7 @@ export default defineConfig({
     port: process.env.PORT2 || 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:1335',
+        target: 'https://fino-x-change-backend.onrender.com',
         changeOrigin: true,
       }
     }

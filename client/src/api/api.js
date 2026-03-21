@@ -3,8 +3,8 @@
  * All backend API calls go through this module
  */
 
-const API_BASE = '/api';
-// const API_BASE = import.meta.env.API_URL + '/api';
+// const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_URL + '/api';
 
 function getToken() {
   return localStorage.getItem('fino_token');
@@ -28,6 +28,8 @@ async function handleResponse(res) {
   }
   return data;
 }
+
+// console.log(import.meta.env);
 
 // Auth API
 export const authApi = {
